@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>お買い物リスト</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+    </style>
+</head>
+<body class="bg-gradient-to-br from-indigo-50 via-white to-pink-50 min-h-screen py-10 px-4">
+    <div class="max-w-md mx-auto bg-white/80 backdrop-blur-md rounded-2xl shadow-xl p-6 border border-white/20">
+        <header class="flex justify-between items-center mb-6">
+            <h1 class="text-2xl font-bold text-gray-800 flex items-center gap-2">
+                🛍️ お買い物リスト
+            </h1>
+            <span id="item-count" class="text-xs bg-indigo-100 text-indigo-700 px-2.5 py-1 rounded-full font-semibold">0件</span>
+        </header>
+
+        <!-- Input Form -->
+        <form id="item-form" class="flex gap-2 mb-6">
+            <input 
+                type="text" 
+                id="item-input" 
+                placeholder="買うものを入力..." 
+                required
+                class="flex-1 px-4 py-2.5 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent text-sm bg-white/50"
+            >
+            <button 
+                type="submit"
+                class="bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2.5 rounded-xl font-medium text-sm transition shadow-md shadow-indigo-200 cursor-pointer"
+            >
+                追加
+            </button>
+        </form>
+
+        <!-- Filters / Actions -->
+        <div class="flex justify-between items-center mb-4 text-xs text-gray-500">
+            <div class="flex gap-2">
+                <button id="filter-all" class="text-indigo-600 font-semibold underline">すべて</button>
+                <button id="filter-active" class="hover:text-gray-700">未完了</button>
+                <button id="filter-completed" class="hover:text-gray-700">完了済み</button>
+            </div>
+            <button id="clear-completed" class="hover:text-red-500 transition">完了済みを削除</button>
+        </div>
+
+        <!-- Item List -->
+        <ul id="item-list" class="space-y-2.5 mb-6 max-h-[50vh] overflow-y-auto pr-1">
+            <!-- Dynamic items -->
+        </ul>
+
+        <footer class="text-center text-xs text-gray-400 pt-4 border-t border-gray-100">
+            Powered by Hermes Agent 🚀
+        </footer>
+    </div>
+
+    <script>
+        const form = document.getElementById('item-form');
+        const input = document.getElementById('item-input');
+        const list = document.getElementById('item-list');
+        const itemCount = document.getElementById('item-count');
+        const clearCompletedBtn = document.getElementById('clear-completed');
+        
+        const filterAll = document.getElementById('filter-all');
+        const filterActive = document.getElementById('filter-active');
+        const filterCompleted = document.getElementById('filter-completed');
+
+        let items = JSON.parse(localStorage.getItem('shopping_items')) || [];
+        let currentFilter = 'all';
+
+        function saveAndRender() {
+            localStorage.setItem('shopping_items', JSON.stringify(items));
+            render();
+        }
+
+        form.addEventListener('submit', (e) => {
+            e.preventDefault();
+            const text = input.value.trim();
+            if (!text) return;
+            items.push({ id: Date.now(), text, completed: false });
+            input.value = '';
+            saveAndRender();
+        });
+
+        function toggleItem(id) {
+            items = items.map(item => item.id === id ? { ...item, completed: !item.completed } : item);
+            saveAndRender();
+        }
+
+        function deleteItem(id) {
+            items = items.filter(item => item.id !== id);
+            saveAndRender();
+        }
+
+        clearCompletedBtn.addEventListener('click', () => {
+            items = items.filter(item => !item.completed);
+            saveAndRender();
+        });
+
+        [filterAll, filterActive, filterCompleted].forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                [filterAll, filterActive, filterCompleted].forEach(b => {
+                    b.className = 'hover:text-gray-700';
+                });
+                e.target.className = 'text-indigo-600 font-semibold underline';
+                currentFilter = e.target.id.replace('filter-', '');
+                render();
+            });
+        });
+
+        function render() {
+            const filtered = items.filter(item => {
+                if (currentFilter === 'active') return !item.completed;
+                if (currentFilter === 'completed') return item.completed;
+                return true;
+            });
+
+            itemCount.textContent = `${items.filter(i => !i.completed).length}件の未完了`;
+
+            if (filtered.length === 0) {
+                list.innerHTML = `<li class="text-center py-8 text-gray-400 text-sm">リストは空です✨</li>`;
+                return;
+            }
+
+            list.innerHTML = filtered.map(item => `
+                <li class="flex items-center justify-between p-3 rounded-xl bg-gray-50/80 hover:bg-gray-100/80 transition border border-gray-100 group">
+                    <label class="flex items-center gap-3 cursor-pointer flex-1 select-none">
+                        <input type="checkbox" ${item.completed ? 'checked' : ''} onclick="toggleItem(${item.id})" class="w-4 h-4 text-indigo-600 rounded border-gray-300 focus:ring-indigo-500">
+                        <span class="text-sm ${item.completed ? 'line-through text-gray-400' : 'text-gray-700'}">${escapeHtml(item.text)}</span>
+                    </label>
+                    <button onclick="deleteItem(${item.id})" class="text-gray-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition p-1 text-sm">
+                        🗑️
+                    </button>
+                </li>
+            `).join('');
+        }
+
+        function escapeHtml(str) {
+            return str.replace(/[&<>'"]/g, 
+                tag => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[tag] || tag)
+            );
+        }
+
+        render();
+    </script>
+</body>
+</html>
